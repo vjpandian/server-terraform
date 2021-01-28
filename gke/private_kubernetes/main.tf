@@ -148,8 +148,8 @@ resource "google_container_cluster" "circleci_cluster" {
 
   min_master_version = data.google_container_engine_versions.gke.release_channel_default_version["REGULAR"]
 
-  network = var.network_uri
-  # subnetwork               = var.subnet_uri
+  network                     = var.network_uri
+  subnetwork                  = var.subnet_uri
   initial_node_count          = "1"
   remove_default_node_pool    = true
   logging_service             = "logging.googleapis.com/kubernetes"

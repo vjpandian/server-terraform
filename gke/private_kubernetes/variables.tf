@@ -114,6 +114,7 @@ variable "nomad_count" {
 variable "network_uri" {
   type = string
 }
+
 variable "subnet_uri" {
   type = string
 }
@@ -134,4 +135,8 @@ variable "preemptible_nodes" {
   type        = bool
   default     = false
   description = "Use preemptible nodes for cluster. Keeps cost low for development or proof of concept cluster"
+}
+
+variable "vm_subnet_cidr" {
+  type = string
 }

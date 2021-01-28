@@ -122,6 +122,23 @@ variable "private_vms" {
   description = "Set to true to isolate VMs for `machine` and `remote_docker` executors from the public internet"
 }
 
+variable "cluster_subnet_cidr" {
+  type        = string
+  default     = "10.0.64.0/19"
+  description = "The CIDR block for the K8s cluster"
+}
+
+variable "nomad_subnet_cidr" {
+  type        = string
+  default     = "10.0.96.0/19"
+  description = "The CIDR block for the Nomad clients"
+}
+
+variable "vm_subnet_cidr" {
+  type        = string
+  default     = "10.0.128.0/19"
+  description = "The CIDR block for external VMs"
+}
 
 variable "allowed_cidr_blocks" {
   type        = list(string)

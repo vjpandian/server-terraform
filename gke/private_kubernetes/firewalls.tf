@@ -13,21 +13,6 @@ resource "google_compute_firewall" "allow_gcloud_health_checks" {
   target_tags   = ["gke-node"]
 }
 
-# very commonly the case, but an assumption that the internal network is 10/8
-#
-resource "google_compute_firewall" "allow_all_internal_network" {
-  name        = "allow-all-internal-network-${var.unique_name}"
-  description = "${var.unique_name} firewall rule for CircleCI Server cluster component"
-  network     = var.network_uri
-  priority    = 980
-
-  allow { protocol = "icmp" }
-  allow { protocol = "tcp" }
-  allow { protocol = "udp" }
-
-  source_ranges = ["10.0.0.0/8"]
-}
-
 # these are higher priority than both the default, and the rules for
 # health checks and internal network(s)
 #

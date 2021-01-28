@@ -62,8 +62,8 @@ resource "google_compute_instance_template" "nomad_template" {
       client_tls_cert = var.enable_mtls ? module.nomad_tls[0].nomad_client_cert : ""
       client_tls_key  = var.enable_mtls ? module.nomad_tls[0].nomad_client_key : ""
       tls_ca          = var.enable_mtls ? module.nomad_tls[0].nomad_tls_ca : ""
-      vpc_cidr        = ""
-      vm_subnet_cidr  = ""
+      vpc_cidr        = var.cluster_subnet_cidr
+      vm_subnet_cidr  = "" # This is only needed in EKS
     }
   )
 
@@ -81,7 +81,7 @@ resource "google_compute_instance_template" "nomad_template" {
   tags = ["ssh", "nomad"]
 
   network_interface {
-    network = var.network_name
+    subnetwork = var.subnet_name
     access_config {}
   }
 

@@ -49,6 +49,16 @@ variable "network_name" {
   description = "Name of the GCP network to attach to nomad"
 }
 
+variable "subnet_name" {
+  type        = string
+  description = "Name of the GCP subnetwork for Nomad clients"
+}
+
+variable "cluster_subnet_cidr" {
+  type        = string
+  description = "The CIDR block of the K8s cluster to prevent access from jobs"
+}
+
 variable "enable_mtls" {
   type        = bool
   default     = true
