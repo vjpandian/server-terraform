@@ -23,7 +23,7 @@ data "aws_ami" "ubuntu_focal" {
 module "nomad_tls" {
   source                = "../shared/modules/tls"
   nomad_server_endpoint = var.server_endpoint
-  count                 = var.enable_mtls ? 1 : 0
+  count                 = var.create_tls ? 1 : 0
 }
 
 locals {
@@ -33,6 +33,14 @@ locals {
     aws_security_group.nomad_sg.id,
     var.ssh_key != null ? aws_security_group.ssh_sg[0].id : "",
   ])
+
+  # Stores MTLS values
+  # If mtls is enabled but no create tls, then use use given vars
+  # If mtls is enabled and create tls, then use use output from tls module
+  # If mtls is disables then use empty strings
+  nomad_server_cert = var.enable_mtls ? (var.create_tls ? var.nomad_server_cert : module.nomad_tls[0].nomad_client_cert) : ""
+  nomad_server_key = var.enable_mtls ? (var.create_tls ? nonsensitive(var.nomad_server_key) : nonsensitive(module.nomad_tls[0].nomad_server_key)) : ""
+  nomad_tls_ca = var.enable_mtls ? (var.create_tls ? var.nomad_tls_ca : module.nomad_tls[0].nomad_tls_ca) : ""
 }
 
 data "cloudinit_config" "nomad_user_data" {
@@ -45,9 +53,9 @@ data "cloudinit_config" "nomad_user_data" {
       "${path.module}/template/nomad-startup.sh.tpl",
       {
         nomad_server_endpoint = var.server_endpoint
-        client_tls_cert       = var.enable_mtls ? module.nomad_tls[0].nomad_client_cert : ""
-        client_tls_key        = var.enable_mtls ? module.nomad_tls[0].nomad_client_key : ""
-        tls_ca                = var.enable_mtls ? module.nomad_tls[0].nomad_tls_ca : ""
+        client_tls_cert       = local.nomad_server_cert
+        client_tls_key        = local.nomad_server_key
+        tls_ca                = local.nomad_tls_ca
         blocked_cidrs         = var.blocked_cidrs
         dns_server            = var.dns_server
       }

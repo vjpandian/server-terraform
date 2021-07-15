@@ -60,6 +60,12 @@ variable "enable_mtls" {
   description = "MTLS support for Nomad traffic. Modifying this can be dangerous and is not recommended."
 }
 
+variable "create_tls" {
+  type        = bool
+  default     = true
+  description = "Will create TLS certs needed to support MTLS. Set false if you with to provide your own certs"
+}
+
 variable "basename" {
   type        = string
   description = "Name used as prefix for AWS resources"
@@ -69,4 +75,23 @@ variable "basename" {
 variable "vpc_id" {
   type        = string
   description = "VPC ID of VPC used for Nomad resources"
+}
+
+variable "nomad_server_cert" {
+  type        = string
+  description = "we'll come back to this"
+  default     = ""
+}
+
+variable "nomad_server_key" {
+  type        = string
+  sensitive   = true
+  description = "we'll come back to this"
+  default     = ""
+}
+
+variable "nomad_tls_ca" {
+  type        = string
+  description = "we'll come back to this"
+  default     = ""
 }
