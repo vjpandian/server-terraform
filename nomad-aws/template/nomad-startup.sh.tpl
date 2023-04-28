@@ -226,10 +226,11 @@ echo "--------------------------------------"
 echo "  Securing Docker network interfaces"
 echo "--------------------------------------"
 docker_chain="DOCKER-USER"
- Blocking meta-data endpoint access
+docker_chain="DOCKER-USER"
+# Blocking meta-data endpoint access
 /sbin/iptables --wait --insert $docker_chain -i docker+ --destination "169.254.0.0/16" --jump DROP
 /sbin/iptables --wait --insert $docker_chain -i br-+ --destination "169.254.0.0/16" --jump DROP
- Blocking internal cluster resources
+# Blocking internal cluster resources
 %{ for cidr_block in blocked_cidrs ~}
 /sbin/iptables --wait --insert $docker_chain -i docker+ --destination "${cidr_block}" --jump DROP
 /sbin/iptables --wait --insert $docker_chain -i br+ --destination "${cidr_block}" --jump DROP
