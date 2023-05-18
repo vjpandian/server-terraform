@@ -78,27 +78,27 @@ if ! (echo $PUBLIC_IP | grep -qP "^[\d.]+$"); then
     echo $PRIVATE_IP | tee /etc/circleci/public-ipv4
 fi
 
-echo "--------------------------------------"
-echo "         Installing nomad"
-echo "--------------------------------------"
-apt-get install -y zip
-curl -o nomad.zip https://releases.hashicorp.com/nomad/1.1.2/nomad_1.1.2_linux_amd64.zip
-unzip nomad.zip
-mv nomad /usr/bin
+#echo "--------------------------------------"
+#echo "         Installing nomad"
+#echo "--------------------------------------"
+#apt-get install -y zip
+#curl -o nomad.zip https://releases.hashicorp.com/nomad/1.1.2/nomad_1.1.2_linux_amd64.zip
+#unzip nomad.zip
+#mv nomad /usr/bin
 
-echo "--------------------------------------"
-echo "       Installling TLS certs"
-echo "--------------------------------------"
-mkdir -p /etc/ssl/nomad
-cat <<EOT > /etc/ssl/nomad/cert.pem
-${client_tls_cert}
-EOT
-cat <<EOT > /etc/ssl/nomad/key.pem
-${client_tls_key}
-EOT
-cat <<EOT > /etc/ssl/nomad/ca.pem
-${tls_ca}
-EOT
+#echo "--------------------------------------"
+#echo "       Installling TLS certs"
+#echo "--------------------------------------"
+#mkdir -p /etc/ssl/nomad
+#cat <<EOT > /etc/ssl/nomad/cert.pem
+#${client_tls_cert}
+#EOT
+#cat <<EOT > /etc/ssl/nomad/key.pem
+#${client_tls_key}
+#EOT
+#cat <<EOT > /etc/ssl/nomad/ca.pem
+#${tls_ca}
+#EOT
 
 echo "--------------------------------------"
 echo "      Creating config.hcl"
@@ -217,23 +217,23 @@ docker run \
 EOT
 chmod 0700 /etc/docker-gc-start.rc
 
-echo "--------------------------------------"
-echo "  Start Docker Garbage Collection"
-echo "--------------------------------------"
-systemctl enable --now docker-gc
-
-echo "--------------------------------------"
-echo "  Securing Docker network interfaces"
-echo "--------------------------------------"
-docker_chain="DOCKER-USER"
-docker_chain="DOCKER-USER"
-# Blocking meta-data endpoint access
-/sbin/iptables --wait --insert $docker_chain -i docker+ --destination "169.254.0.0/16" --jump DROP
-/sbin/iptables --wait --insert $docker_chain -i br-+ --destination "169.254.0.0/16" --jump DROP
-# Blocking internal cluster resources
-%{ for cidr_block in blocked_cidrs ~}
-/sbin/iptables --wait --insert $docker_chain -i docker+ --destination "${cidr_block}" --jump DROP
-/sbin/iptables --wait --insert $docker_chain -i br+ --destination "${cidr_block}" --jump DROP
-%{ endfor ~}
-/sbin/iptables --wait --insert $docker_chain 1 -i br+ --destination "${dns_server}" -p tcp --dport 53 --jump RETURN
-/sbin/iptables --wait --insert $docker_chain 2 -i br+ --destination "${dns_server}" -p udp --dport 53 --jump RETURN
+#echo "--------------------------------------"
+#echo "  Start Docker Garbage Collection"
+#echo "--------------------------------------"
+#systemctl enable --now docker-gc
+#
+#echo "--------------------------------------"
+#echo "  Securing Docker network interfaces"
+#echo "--------------------------------------"
+#docker_chain="DOCKER-USER"
+#docker_chain="DOCKER-USER"
+## Blocking meta-data endpoint access
+#/sbin/iptables --wait --insert $docker_chain -i docker+ --destination "169.254.0.0/16" --jump DROP
+#/sbin/iptables --wait --insert $docker_chain -i br-+ --destination "169.254.0.0/16" --jump DROP
+## Blocking internal cluster resources
+#%{ for cidr_block in blocked_cidrs ~}
+#/sbin/iptables --wait --insert $docker_chain -i docker+ --destination "${cidr_block}" --jump DROP
+#/sbin/iptables --wait --insert $docker_chain -i br+ --destination "${cidr_block}" --jump DROP
+#%{ endfor ~}
+#/sbin/iptables --wait --insert $docker_chain 1 -i br+ --destination "${dns_server}" -p tcp --dport 53 --jump RETURN
+#/sbin/iptables --wait --insert $docker_chain 2 -i br+ --destination "${dns_server}" -p udp --dport 53 --jump RETURN
