@@ -221,17 +221,17 @@ echo "  Start Docker Garbage Collection"
 echo "--------------------------------------"
 systemctl enable --now docker-gc
 
-echo "--------------------------------------"
-echo "  Securing Docker network interfaces"
-echo "--------------------------------------"
+#echo "--------------------------------------"
+#echo "  Securing Docker network interfaces"
+#echo "--------------------------------------"
 docker_chain="DOCKER-USER"
 # Blocking meta-data endpoint access
-/sbin/iptables --wait --insert $docker_chain -i docker+ --destination "169.254.0.0/16" --jump DROP
-/sbin/iptables --wait --insert $docker_chain -i br-+ --destination "169.254.0.0/16" --jump DROP
+#/sbin/iptables --wait --insert $docker_chain -i docker+ --destination "169.254.0.0/16" --jump DROP
+#/sbin/iptables --wait --insert $docker_chain -i br-+ --destination "169.254.0.0/16" --jump DROP
 # Blocking internal cluster resources
-%{ for cidr_block in blocked_cidrs ~}
-/sbin/iptables --wait --insert $docker_chain -i docker+ --destination "${cidr_block}" --jump DROP
-/sbin/iptables --wait --insert $docker_chain -i br+ --destination "${cidr_block}" --jump DROP
-%{ endfor ~}
-/sbin/iptables --wait --insert $docker_chain 1 -i br+ --destination "${dns_server}" -p tcp --dport 53 --jump RETURN
-/sbin/iptables --wait --insert $docker_chain 2 -i br+ --destination "${dns_server}" -p udp --dport 53 --jump RETURN
+#%{ for cidr_block in blocked_cidrs ~}
+#/sbin/iptables --wait --insert $docker_chain -i docker+ --destination "${cidr_block}" --jump DROP
+#/sbin/iptables --wait --insert $docker_chain -i br+ --destination "${cidr_block}" --jump DROP
+#%{ endfor ~}
+#/sbin/iptables --wait --insert $docker_chain 1 -i br+ --destination "${dns_server}" -p tcp --dport 53 --jump RETURN
+#/sbin/iptables --wait --insert $docker_chain 2 -i br+ --destination "${dns_server}" -p udp --dport 53 --jump RETURN
