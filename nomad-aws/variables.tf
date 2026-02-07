@@ -246,7 +246,7 @@ variable "allow_ssh" {
 
 variable "server_public_ip" {
   type        = bool
-  default     = false
+  default     = true
   description = "Should the Nomad Server EC2 instances have a public IP?"
   validation {
     condition     = var.server_public_ip == true || var.server_public_ip == false
