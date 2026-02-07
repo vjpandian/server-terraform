@@ -31,7 +31,7 @@ echo "--------------------------------------"
 apt-get install -y ntp
 
 echo "--------------------------------------"
-echo "Installing Nomad"
+echo "         Installing nomad"
 echo "--------------------------------------"
 sudo apt-get update && \
 sudo apt-get install -y wget gpg coreutils
