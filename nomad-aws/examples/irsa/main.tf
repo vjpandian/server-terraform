@@ -33,8 +33,7 @@ module "nomad-aws" {
   source = "../.."
 
   # prefix to add in AWS resources name
-  basename   = "cci"
-  aws_region = "us-east-1"
+  basename = "cci"
 
   # Number of nomad clients to run
   nodes = 4

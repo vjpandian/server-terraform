@@ -43,12 +43,25 @@ install_nomad() {
 	log "Installing Nomad Server"
 	log "-----------------------------------------"
 
-	install wget gpg coreutils zip
-	wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
-	echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
-	sudo apt-get update && sudo apt-get install nomad=${nomad_version}
+	sudo apt-get update && \
+	sudo apt-get install -y wget gpg coreutils
+	install zip
+	curl -fsSL https://apt.releases.hashicorp.com/gpg | \
+	  sudo gpg --dearmor --yes -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
 
-	nomad --version || ( echo "Nomad failed to install" && exit 1 )
+	echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | \
+	  sudo tee /etc/apt/sources.list.d/hashicorp.list
+
+	export DEBIAN_FRONTEND=noninteractive
+	sudo apt-get update
+
+	if [ -z "$nomad_version" ] || [ "$nomad_version"=="latest" ]; then
+		install nomad
+	else
+		install nomad=${nomad_version}
+	fi
+
+	sudo nomad version || ( echo "Nomad failed to install" && exit 1 )
 }
 
 configure_nomad() {
@@ -58,31 +71,20 @@ configure_nomad() {
 	log "Installing TLS Certificates"
 	log "-----------------------------------------"
 
-	mkdir -p /etc/ssl/nomad/
-	chmod 0700 /etc/ssl/nomad/
+	mkdir -p /etc/nomad/ssl
+	chmod 0700 /etc/nomad/ssl
 	
-	cat <<-EOT > /etc/ssl/nomad/server.pem
+	cat <<-EOT > /etc/nomad/ssl/cert.pem
 	${tls_cert}
 	EOT
 	
-	cat <<-EOT > /etc/ssl/nomad/key.pem
+	cat <<-EOT > /etc/nomad/ssl/key.pem
 	${tls_key}
 	EOT
 	
-	cat <<-EOT > /etc/ssl/nomad/ca.pem
+	cat <<-EOT > /etc/nomad/ssl/ca.pem
 	${tls_ca}
 	EOT
-
-	echo "--------------------------------------"
-	echo "      Setting environment variables"
-	echo "--------------------------------------"
-	echo 'export NOMAD_CACERT=/etc/ssl/nomad/ca.pem' >> /etc/environment
-	echo 'export NOMAD_CLIENT_CERT=/etc/ssl/nomad/server.pem' >> /etc/environment
-	echo 'export NOMAD_CLIENT_KEY=/etc/ssl/nomad/key.pem' >> /etc/environment
-	echo "export NOMAD_ADDR=https://localhost:4646" >> /etc/environment	
-
-	source /etc/environment
-	env | grep "NOMAD_"
 	##########################################################################
 
 
@@ -93,7 +95,7 @@ configure_nomad() {
 	
 	mkdir -p /etc/nomad
 	
-	cat <<-EOT > /etc/nomad/server.hcl
+	cat <<-EOT > /etc/nomad/config.hcl
 	log_level = "DEBUG"
 	name = "$(hostname)"
 	data_dir = "/opt/nomad"
@@ -122,22 +124,23 @@ configure_nomad() {
 	}
 	EOT
 
-	cat <<-EOT >> /etc/nomad/server.hcl
-	tls {
-		http = true
-		rpc  = true
-		# This verifies the CN ([role].[region].nomad) in the certificate,
-		# not the hostname or DNS name of the of the remote party.
-		# https://learn.hashicorp.com/tutorials/nomad/security-enable-tls?in=nomad/transport-security#node-certificates
-		verify_server_hostname = false
-		ca_file	= "/etc/ssl/nomad/ca.pem"
-		cert_file = "/etc/ssl/nomad/server.pem"
-		key_file	= "/etc/ssl/nomad/key.pem"
-	}
-	EOT
+	if [ "${tls_cert}" ]; then
+		cat <<-EOT >> /etc/nomad/config.hcl
+		tls {
+		  http = false
+		  rpc  = true
+		  # This verifies the CN ([role].[region].nomad) in the certificate,
+		  # not the hostname or DNS name of the of the remote party.
+		  # https://learn.hashicorp.com/tutorials/nomad/security-enable-tls?in=nomad/transport-security#node-certificates
+		  verify_server_hostname = true
+		  ca_file	= "/etc/nomad/ssl/ca.pem"
+		  cert_file = "/etc/nomad/ssl/cert.pem"
+		  key_file	= "/etc/nomad/ssl/key.pem"
+		}
+		EOT
+	fi
 	##########################################################################
 
-	log ""
 
 
 	log "-----------------------------------------"
@@ -147,25 +150,20 @@ configure_nomad() {
 	[Unit]
 	Description="nomad server"
 	[Service]
-	Environment="NOMAD_CACERT=/etc/ssl/nomad/ca.pem"
-	Environment="NOMAD_CLIENT_CERT=/etc/ssl/nomad/server.pem"
-	Environment="NOMAD_CLIENT_KEY=/etc/ssl/nomad/key.pem"
-	Environment="NOMAD_ADDR=https://localhost:4646"	
 	Restart=always
 	RestartSec=30
 	TimeoutStartSec=1m
-	ExecStart=/usr/bin/nomad agent -server -config /etc/nomad/server.hcl
+	ExecStart=/usr/bin/nomad agent -server -config /etc/nomad/config.hcl
 	[Install]
 	WantedBy=multi-user.target
 	EOT
 
 	log "Nomad config:"
 	log "-----------------------------------------"
-	cat /etc/nomad/server.hcl
+	cat /etc/nomad/config.hcl
 	log "-----------------------------------------"
 
 	log ""
-
 	log "Starting up nomad"
 	systemctl enable --now nomad
 }

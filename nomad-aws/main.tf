@@ -1,17 +1,16 @@
+locals {
+
+  nomad_host_name_if_server      = var.deploy_nomad_server_instances && var.nomad_server_hostname == "" ? "${var.basename}-circleci-nomad-server-nlb-*.elb.${var.aws_region}.amazonaws.com" : var.nomad_server_hostname
+  nomad_server_hostname_and_port = "${local.nomad_host_name_if_server}:${var.nomad_server_port}"
+  server_retry_join              = "provider=aws tag_key=${var.tag_key_for_discover} tag_value=${var.tag_value_for_discover} addr_type=${var.addr_type} region=${var.aws_region}"
+  nomad_client_instance_role     = var.role_name != null ? var.role_name : (var.deploy_nomad_server_instances ? aws_iam_role.nomad_instance_role[0].name : null)
+
+  instance_tags = merge(var.instance_tags, { "type" = "nomad-client" })
+}
+
 resource "random_string" "key_suffix" {
   length  = 8
   special = false
-}
-
-locals {
-
-  subnet_ids                 = var.subnet != "" ? [var.subnet] : var.subnets
-  tag_key_for_discover       = "identifier"
-  tag_value_for_discover     = "${var.basename}-circleci-nomad-server-instances-${random_string.key_suffix.result}"
-  server_retry_join          = "provider=aws tag_key=${local.tag_key_for_discover} tag_value=${local.tag_value_for_discover} addr_type=${var.addr_type} region=${var.aws_region}"
-  nomad_client_instance_role = var.role_name != null ? var.role_name : (var.deploy_nomad_server_instances ? aws_iam_role.nomad_instance_role[0].name : null)
-
-  instance_tags = merge(var.instance_tags, { "type" = "circleci-nomad-client" })
 }
 
 resource "aws_key_pair" "ssh_key" {
@@ -37,8 +36,19 @@ data "aws_vpc" "nomad" {
 
 module "nomad_tls" {
   source                = "../shared/modules/tls"
-  nomad_server_hostname = var.deploy_nomad_server_instances ? "nomad-server.${var.nomad_server_hostname}" : var.nomad_server_hostname
+  nomad_server_hostname = local.nomad_host_name_if_server
   nomad_server_port     = var.nomad_server_port
+  count                 = var.enable_mtls ? 1 : 0
+}
+
+locals {
+  # Creates the Nomad Security Group(SG) list for the Instances.
+  # Will include SSH SG if var.ssh_key is not null.
+  nomad_security_groups = compact([
+    aws_security_group.nomad_sg.id,
+    aws_security_group.nomad_traffic_sg.id,
+    var.ssh_key != null ? aws_security_group.ssh_sg[0].id : "",
+  ])
 }
 
 data "cloudinit_config" "nomad_user_data" {
@@ -51,15 +61,14 @@ data "cloudinit_config" "nomad_user_data" {
       "${path.module}/template/nomad-startup.sh.tpl",
       {
         nomad_version         = var.nomad_version
-        client_tls_cert       = module.nomad_tls.nomad_client_cert
-        client_tls_key        = module.nomad_tls.nomad_client_key
-        tls_ca                = module.nomad_tls.nomad_tls_ca
+        nomad_server_endpoint = local.nomad_server_hostname_and_port
+        client_tls_cert       = var.enable_mtls ? module.nomad_tls[0].nomad_client_cert : ""
+        client_tls_key        = var.enable_mtls ? module.nomad_tls[0].nomad_client_key : ""
+        tls_ca                = var.enable_mtls ? module.nomad_tls[0].nomad_tls_ca : ""
         blocked_cidrs         = var.blocked_cidrs
         docker_network_cidr   = var.docker_network_cidr
         dns_server            = var.dns_server
-        server_retry_join     = var.deploy_nomad_server_instances ? local.server_retry_join : var.nomad_server_hostname
-        log_level             = var.log_level
-        external_nomad_server = var.deploy_nomad_server_instances
+        server_retry_join     = var.deploy_nomad_server_instances ? local.server_retry_join : local.nomad_server_hostname_and_port
       }
     )
   }
@@ -80,8 +89,9 @@ resource "aws_launch_template" "nomad_clients" {
 
   network_interfaces {
     associate_public_ip_address = var.client_public_ip
-    security_groups             = length(var.security_group_id) != 0 ? var.security_group_id : [aws_security_group.nomad_sg.id]
+    security_groups             = length(var.security_group_id) != 0 ? var.security_group_id : local.nomad_security_groups
   }
+
 
   metadata_options {
     http_tokens = var.enable_imdsv2
@@ -115,8 +125,8 @@ resource "aws_launch_template" "nomad_clients" {
 }
 
 resource "aws_autoscaling_group" "clients_asg" {
-  name                = "${var.basename}-circleci-nomad-clients-asg"
-  vpc_zone_identifier = local.subnet_ids
+  name                = "${var.basename}_circleci_nomad_clients_asg"
+  vpc_zone_identifier = var.subnet != "" ? [var.subnet] : var.subnets
   max_size            = var.max_nodes
   min_size            = var.nomad_auto_scaler ? 1 : 0 # When using nomad-autoscaler, the min nodes can't be less than 1. For more info: https://github.com/hashicorp/nomad-autoscaler/issues/530
   desired_capacity    = var.nodes

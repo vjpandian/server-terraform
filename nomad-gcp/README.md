@@ -14,9 +14,9 @@ provider "google-beta" {
   zone    = "<< GCP compute zone to deploy nomad clients >>""
 }
 
-module "nomad" {
+module "nomad_clients" {
   # We strongly recommend pinning the version using ref=<<release tag>> as is done here
-  source = "git::https://github.com/CircleCI-Public/server-terraform.git//nomad-gcp?ref=4.9.0"
+  source = "git::https://github.com/CircleCI-Public/server-terraform.git//nomad-gcp?ref=4.0.0"
 
   zone            = "<< GCP compute zone to deploy nomad clients >>"
   region          = "<< GCP compute region to deploy nomad clients >>"
@@ -26,7 +26,7 @@ module "nomad" {
 }
 
 output "module" {
-  value = module.nomad
+  value = module.nomad_clients
 }
 ```
 
@@ -75,9 +75,7 @@ There are more examples in the [examples](./examples/) directory.
 | [google_service_account_key.nomad-as-key](https://registry.terraform.io/providers/hashicorp/google-beta/latest/docs/resources/service_account_key) | resource |
 | [local_file.nomad-as-key-file](https://registry.terraform.io/providers/hashicorp/local/latest/docs/resources/file) | resource |
 | [google_compute_image.machine_image](https://registry.terraform.io/providers/hashicorp/google-beta/latest/docs/data-sources/compute_image) | data source |
-| [google_compute_subnetwork.k8s](https://registry.terraform.io/providers/hashicorp/google-beta/latest/docs/data-sources/compute_subnetwork) | data source |
 | [google_compute_subnetwork.nomad](https://registry.terraform.io/providers/hashicorp/google-beta/latest/docs/data-sources/compute_subnetwork) | data source |
-| [google_container_cluster.k8s](https://registry.terraform.io/providers/hashicorp/google-beta/latest/docs/data-sources/container_cluster) | data source |
 | [google_project.project](https://registry.terraform.io/providers/hashicorp/google-beta/latest/docs/data-sources/project) | data source |
 
 ## Inputs
@@ -85,7 +83,7 @@ There are more examples in the [examples](./examples/) directory.
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
 | <a name="input_add_server_join"></a> [add\_server\_join](#input\_add\_server\_join) | Includes the 'server\_join' block when setting up nomad clients. Should be disabled when the nomad server endpoint is not immediately known (eg, for dedicated nomad clients). | `bool` | `true` | no |
-| <a name="input_allowed_ips_nomad_ssh_access"></a> [allowed\_ips\_nomad\_ssh\_access](#input\_allowed\_ips\_nomad\_ssh\_access) | List of IPv4 CIDR ranges that are permitted SSH access nomad clients nodes | `list(string)` | <pre>[<br/>  "35.235.240.0/20"<br/>]</pre> | no |
+| <a name="input_allowed_ips_nomad_ssh_access"></a> [allowed\_ips\_nomad\_ssh\_access](#input\_allowed\_ips\_nomad\_ssh\_access) | List of IPv4 CIDR ranges that are permitted SSH access nomad clients nodes | `list(string)` | `[]` | no |
 | <a name="input_assign_public_ip"></a> [assign\_public\_ip](#input\_assign\_public\_ip) | Assign public IP | `bool` | `true` | no |
 | <a name="input_autoscaling_mode"></a> [autoscaling\_mode](#input\_autoscaling\_mode) | Autoscaler mode. Can be<br/>- "ON": Autoscaler will scale up and down to reach cpu target and react to cron schedules<br/>- "OFF": Autoscaler will never scale up or down<br/>- "ONLY\_SCALE\_OUT": Autoscaler will only scale out (default)<br/>Warning: jobs may be interrupted on scale down. Only select "ON" if<br/>interruptions are acceptible for your use case. | `string` | `"ONLY_SCALE_OUT"` | no |
 | <a name="input_autoscaling_schedules"></a> [autoscaling\_schedules](#input\_autoscaling\_schedules) | Autoscaler scaling schedules. Accepts the same arguments are documented<br/>upstream here: https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/compute_autoscaler#scaling_schedules | <pre>list(object({<br/>    name                  = string<br/>    min_required_replicas = number<br/>    schedule              = string<br/>    time_zone             = string<br/>    duration_sec          = number<br/>    disabled              = bool<br/>    description           = string<br/>  }))</pre> | `[]` | no |
@@ -100,10 +98,7 @@ There are more examples in the [examples](./examples/) directory.
 | <a name="input_health_check_interval_sec"></a> [health\_check\_interval\_sec](#input\_health\_check\_interval\_sec) | Nomad Server Heath Check Frequency in seconds | `number` | `30` | no |
 | <a name="input_health_check_timeout_sec"></a> [health\_check\_timeout\_sec](#input\_health\_check\_timeout\_sec) | Nomad Server Heath Check Timeout in seconds | `number` | `5` | no |
 | <a name="input_health_check_unhealthy_threshold"></a> [health\_check\_unhealthy\_threshold](#input\_health\_check\_unhealthy\_threshold) | Number of health checks failure in a row to determine unhealthy | `number` | `5` | no |
-| <a name="input_k8s_cluster_location"></a> [k8s\_cluster\_location](#input\_k8s\_cluster\_location) | Kubernetes Cluster Location, Either Region or Zone | `string` | `""` | no |
-| <a name="input_k8s_cluster_name"></a> [k8s\_cluster\_name](#input\_k8s\_cluster\_name) | Kubernetes Cluster Name | `string` | `""` | no |
 | <a name="input_k8s_namespace"></a> [k8s\_namespace](#input\_k8s\_namespace) | If enable\_workload\_identity is true, provide application k8s namespace | `string` | `"circleci-server"` | no |
-| <a name="input_log_level"></a> [log\_level](#input\_log\_level) | Nomad Server and Client Log level | `string` | `"INFO"` | no |
 | <a name="input_machine_image_family"></a> [machine\_image\_family](#input\_machine\_image\_family) | The family value used to retrieve the virtual machine image. | `string` | `"ubuntu-2204-lts"` | no |
 | <a name="input_machine_image_project"></a> [machine\_image\_project](#input\_machine\_image\_project) | The project value used to retrieve the virtual machine image. | `string` | `"ubuntu-os-cloud"` | no |
 | <a name="input_machine_type"></a> [machine\_type](#input\_machine\_type) | Instance type for nomad clients | `string` | `"n2-standard-8"` | no |
@@ -126,11 +121,11 @@ There are more examples in the [examples](./examples/) directory.
 | <a name="input_server_autoscaling_schedules"></a> [server\_autoscaling\_schedules](#input\_server\_autoscaling\_schedules) | Autoscaler scaling schedules. Accepts the same arguments are documented<br/>upstream here: https://registry.terraform.io/providers/hashicorp/google/latest/docs/resources/compute_autoscaler#scaling_schedules | <pre>list(object({<br/>    name                  = string<br/>    min_required_replicas = number<br/>    schedule              = string<br/>    time_zone             = string<br/>    duration_sec          = number<br/>    disabled              = bool<br/>    description           = string<br/>  }))</pre> | `[]` | no |
 | <a name="input_server_disk_size_gb"></a> [server\_disk\_size\_gb](#input\_server\_disk\_size\_gb) | Size of the root disk for nomad server in GB. | `number` | `20` | no |
 | <a name="input_server_disk_type"></a> [server\_disk\_type](#input\_server\_disk\_type) | Root disk type. Can be 'pd-standard', 'pd-ssd', 'pd-balanced' or 'local-ssd' | `string` | `"pd-ssd"` | no |
-| <a name="input_server_machine_image_family"></a> [server\_machine\_image\_family](#input\_server\_machine\_image\_family) | The family value used to retrieve the virtual machine image for nomad server. | `string` | `"ubuntu-2204-lts"` | no |
 | <a name="input_server_machine_type"></a> [server\_machine\_type](#input\_server\_machine\_type) | Instance type for nomad server | `string` | `"n2-standard-4"` | no |
 | <a name="input_server_target_cpu_utilization"></a> [server\_target\_cpu\_utilization](#input\_server\_target\_cpu\_utilization) | Target CPU utilization to trigger autoscaling for nomad server cluster | `number` | `0.8` | no |
 | <a name="input_subnetwork"></a> [subnetwork](#input\_subnetwork) | Subnetwork to deploy nomad clients into. NB. This is required if using custom subnets | `string` | `""` | no |
 | <a name="input_target_cpu_utilization"></a> [target\_cpu\_utilization](#input\_target\_cpu\_utilization) | Target CPU utilization to trigger autoscaling | `number` | `0.5` | no |
+| <a name="input_unsafe_disable_mtls"></a> [unsafe\_disable\_mtls](#input\_unsafe\_disable\_mtls) | Disables mTLS between nomad client and servers. Compromises the authenticity and confidentiality of client-server communication. Should not be set to true in any production setting | `bool` | `false` | no |
 | <a name="input_zone"></a> [zone](#input\_zone) | GCP compute zone to deploy nomad clients into (e.g us-east1-a) | `string` | n/a | yes |
 
 ## Outputs
@@ -142,13 +137,13 @@ There are more examples in the [examples](./examples/) directory.
 | <a name="output_managed_instance_group_region"></a> [managed\_instance\_group\_region](#output\_managed\_instance\_group\_region) | n/a |
 | <a name="output_managed_instance_group_type"></a> [managed\_instance\_group\_type](#output\_managed\_instance\_group\_type) | n/a |
 | <a name="output_managed_instance_group_zone"></a> [managed\_instance\_group\_zone](#output\_managed\_instance\_group\_zone) | n/a |
-| <a name="output_msg"></a> [msg](#output\_msg) | n/a |
-| <a name="output_nomad_clients_cert_base64"></a> [nomad\_clients\_cert\_base64](#output\_nomad\_clients\_cert\_base64) | set this value for the `nomad.clients.mTLS.certificate` key in the CircleCI Server's Helm values.yaml |
-| <a name="output_nomad_clients_key_base64"></a> [nomad\_clients\_key\_base64](#output\_nomad\_clients\_key\_base64) | set this value for the `nomad.clients.mTLS.privateKey` key in the CircleCI Server's Helm values.yaml |
 | <a name="output_nomad_server_ip"></a> [nomad\_server\_ip](#output\_nomad\_server\_ip) | n/a |
+| <a name="output_nomad_server_tls_cert"></a> [nomad\_server\_tls\_cert](#output\_nomad\_server\_tls\_cert) | n/a |
 | <a name="output_nomad_server_tls_cert_base64"></a> [nomad\_server\_tls\_cert\_base64](#output\_nomad\_server\_tls\_cert\_base64) | set this value for the `nomad.server.rpc.mTLS.certificate` key in the CircleCI Server's Helm values.yaml |
+| <a name="output_nomad_server_tls_key"></a> [nomad\_server\_tls\_key](#output\_nomad\_server\_tls\_key) | n/a |
 | <a name="output_nomad_server_tls_key_base64"></a> [nomad\_server\_tls\_key\_base64](#output\_nomad\_server\_tls\_key\_base64) | set this value for the `nomad.server.rpc.mTLS.privateKey` key in the CircleCI Server's Helm values.yaml |
-| <a name="output_nomad_tls_ca_base64"></a> [nomad\_tls\_ca\_base64](#output\_nomad\_tls\_ca\_base64) | set this value for the `nomad.server.rpc.mTLS.CACertificate` and `nomad.clients.mTLS.CACertificate` key in the CircleCI Server's Helm values.yaml |
+| <a name="output_nomad_tls_ca"></a> [nomad\_tls\_ca](#output\_nomad\_tls\_ca) | n/a |
+| <a name="output_nomad_tls_ca_base64"></a> [nomad\_tls\_ca\_base64](#output\_nomad\_tls\_ca\_base64) | set this value for the `nomad.server.rpc.mTLS.CACertificate` key in the CircleCI Server's Helm values.yaml |
 | <a name="output_service_account_email"></a> [service\_account\_email](#output\_service\_account\_email) | n/a |
 | <a name="output_service_account_key"></a> [service\_account\_key](#output\_service\_account\_key) | Base64 decoded service account key. |
 | <a name="output_service_account_key_location"></a> [service\_account\_key\_location](#output\_service\_account\_key\_location) | n/a |

@@ -2,27 +2,9 @@ resource "google_compute_address" "nomad_server" {
   count = var.deploy_nomad_server_instances ? 1 : 0
 
   name         = "${var.name}-nomad-server-lb-ip"
-  address_type = "INTERNAL"
+  address_type = "EXTERNAL"
   region       = var.region
-  subnetwork   = var.subnetwork
-  purpose      = "GCE_ENDPOINT"
 }
-
-data "google_container_cluster" "k8s" {
-  count = var.deploy_nomad_server_instances ? 1 : 0
-
-  name     = var.k8s_cluster_name
-  location = var.k8s_cluster_location
-}
-
-data "google_compute_subnetwork" "k8s" {
-  count = var.deploy_nomad_server_instances ? 1 : 0
-
-  # Extract subnet name from self_link
-  name   = element(split("/", data.google_container_cluster.k8s[0].subnetwork), length(split("/", data.google_container_cluster.k8s[0].subnetwork)) - 1)
-  region = var.region
-}
-
 
 module "server" {
   source = "./modules/nomad-server-gcp"
@@ -36,9 +18,9 @@ module "server" {
   nomad_server_hostname            = var.nomad_server_hostname
   name                             = var.name
   project_id                       = var.project_id
-  tls_cert                         = module.tls.nomad_server_cert
-  tls_key                          = module.tls.nomad_server_key
-  tls_ca                           = module.tls.nomad_tls_ca
+  tls_cert                         = var.unsafe_disable_mtls ? "" : module.tls[0].nomad_server_cert
+  tls_key                          = var.unsafe_disable_mtls ? "" : module.tls[0].nomad_server_key
+  tls_ca                           = var.unsafe_disable_mtls ? "" : module.tls[0].nomad_tls_ca
   min_server_instances             = var.min_server_instances
   max_server_instances             = var.max_server_instances
   nomad_server_auto_scaling        = var.nomad_server_auto_scaling
@@ -48,7 +30,6 @@ module "server" {
   server_disk_size_gb              = var.server_disk_size_gb
   server_disk_type                 = var.server_disk_type
   server_machine_type              = var.server_machine_type
-  machine_image_family             = var.server_machine_image_family
   server_retry_join                = local.server_retry_join
   nomad_server_lb_ip               = google_compute_address.nomad_server[0].address
   health_check_timeout_sec         = var.health_check_timeout_sec
@@ -56,9 +37,4 @@ module "server" {
   health_check_healthy_threshold   = var.health_check_healthy_threshold
   health_check_unhealthy_threshold = var.health_check_unhealthy_threshold
   enable_firewall_logging          = var.enable_firewall_logging
-  allowed_ips_nomad_ssh_access     = var.allowed_ips_nomad_ssh_access
-  nomad_version                    = var.nomad_version
-  nomad_clients_tags               = local.tags
-  gcp_cluster_ipv4_cidr            = data.google_container_cluster.k8s[0].cluster_ipv4_cidr
-  gcp_cluster_network_cidr         = data.google_compute_subnetwork.k8s[0].ip_cidr_range
 }

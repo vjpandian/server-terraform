@@ -95,7 +95,6 @@ run "test_server_launch_template" {
     deploy_nomad_server_instances = true
     server_machine_type           = "m5.xlarge"
     server_disk_size_gb           = 50
-    aws_region                    = "us-east-1"
   }
 
   assert {
@@ -126,7 +125,6 @@ run "test_server_autoscaling_group" {
     deploy_nomad_server_instances = true
     desired_server_instances      = 3
     max_server_instances          = 7
-    aws_region                    = "us-east-1"
   }
 
   assert {
@@ -150,16 +148,15 @@ run "test_load_balancer_configuration" {
     vpc_id                        = "vpc-12345678"
     subnets                       = ["subnet-12345678"]
     deploy_nomad_server_instances = true
-    aws_region                    = "us-east-1"
   }
 
   assert {
-    condition     = aws_lb.internal_nlb[0].internal == true
+    condition     = module.server[0].load_balancer.internal == true
     error_message = "Load balancer should be internal"
   }
 
   assert {
-    condition     = aws_lb.internal_nlb[0].load_balancer_type == "network"
+    condition     = module.server[0].load_balancer.load_balancer_type == "network"
     error_message = "Load balancer should be network type"
   }
 

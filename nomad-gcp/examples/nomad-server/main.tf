@@ -61,17 +61,6 @@ variable "machine_type" {
   default = "n2-standard-8"
 }
 
-variable "k8s_cluster_name" {
-  type        = string
-  description = "Kubernetes Cluster Name"
-  default     = "my-k8s-cluster"
-}
-
-variable "k8s_cluster_location" {
-  type        = string
-  description = "Kubernetes Cluster Location, Either Region or Zone"
-  default     = "us-west1"
-}
 
 module "nomad" {
   # we are using latest code for gcp nomad client here
@@ -86,6 +75,7 @@ module "nomad" {
   machine_type          = var.machine_type
   project_id            = var.project
 
+  unsafe_disable_mtls    = false
   assign_public_ip       = true
   preemptible            = true
   target_cpu_utilization = 0.50
@@ -100,8 +90,6 @@ module "nomad" {
   min_server_instances          = 3
   server_disk_size_gb           = 50
   server_target_cpu_utilization = 0.8
-  k8s_cluster_name              = var.k8s_cluster_name
-  k8s_cluster_location          = var.k8s_cluster_location
 }
 
 output "module" {

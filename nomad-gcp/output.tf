@@ -1,27 +1,30 @@
+output "nomad_server_tls_cert" {
+  value = var.unsafe_disable_mtls ? "" : module.tls[0].nomad_server_cert
+}
+
+output "nomad_server_tls_key" {
+  value = var.unsafe_disable_mtls ? "" : nonsensitive(module.tls[0].nomad_server_key)
+}
+
+output "nomad_tls_ca" {
+  value = var.unsafe_disable_mtls ? "" : module.tls[0].nomad_tls_ca
+}
+
 output "nomad_server_tls_cert_base64" {
   description = "set this value for the `nomad.server.rpc.mTLS.certificate` key in the CircleCI Server's Helm values.yaml"
-  value       = var.deploy_nomad_server_instances ? "" : base64encode(module.tls.nomad_server_cert)
+  value       = var.unsafe_disable_mtls ? "" : base64encode(module.tls[0].nomad_server_cert)
 }
 
 output "nomad_server_tls_key_base64" {
   description = "set this value for the `nomad.server.rpc.mTLS.privateKey` key in the CircleCI Server's Helm values.yaml"
-  value       = var.deploy_nomad_server_instances ? "" : nonsensitive(base64encode(module.tls.nomad_server_key))
+  value       = var.unsafe_disable_mtls ? "" : nonsensitive(base64encode(module.tls[0].nomad_server_key))
 }
 
 output "nomad_tls_ca_base64" {
-  description = "set this value for the `nomad.server.rpc.mTLS.CACertificate` and `nomad.clients.mTLS.CACertificate` key in the CircleCI Server's Helm values.yaml"
-  value       = base64encode(module.tls.nomad_tls_ca)
+  description = "set this value for the `nomad.server.rpc.mTLS.CACertificate` key in the CircleCI Server's Helm values.yaml"
+  value       = var.unsafe_disable_mtls ? "" : base64encode(module.tls[0].nomad_tls_ca)
 }
 
-output "nomad_clients_cert_base64" {
-  description = "set this value for the `nomad.clients.mTLS.certificate` key in the CircleCI Server's Helm values.yaml"
-  value       = var.deploy_nomad_server_instances ? base64encode(module.tls.nomad_client_cert) : ""
-}
-
-output "nomad_clients_key_base64" {
-  description = "set this value for the `nomad.clients.mTLS.privateKey` key in the CircleCI Server's Helm values.yaml"
-  value       = var.deploy_nomad_server_instances ? nonsensitive(base64encode(module.tls.nomad_client_key)) : ""
-}
 
 output "managed_instance_group_nomad_client" {
   value = google_compute_instance_group_manager.nomad.name
@@ -59,15 +62,4 @@ output "managed_instance_group_nomad_server" {
 
 output "nomad_server_ip" {
   value = var.deploy_nomad_server_instances ? google_compute_address.nomad_server[0].address : ""
-}
-
-output "msg" {
-  value = (
-    var.deploy_nomad_server_instances
-    ? <<-EOT
-    Using External Nomad Servers -
-    Create a DNS entry - nomad-server.${var.nomad_server_hostname} which points to ${google_compute_address.nomad_server[0].address}
-  EOT
-    : ""
-  )
 }

@@ -1,27 +1,33 @@
+output "mtls_enabled" {
+  description = "set this value for the `nomad.server.rpc.mTLS.enabled` key in the CircleCI Server's Helm values.yaml"
+  value       = var.enable_mtls
+}
+
+output "nomad_server_cert" {
+  value = var.enable_mtls ? module.nomad_tls[0].nomad_server_cert : ""
+}
+
+output "nomad_server_key" {
+  value = var.enable_mtls ? nonsensitive(module.nomad_tls[0].nomad_server_key) : ""
+}
+
+output "nomad_tls_ca" {
+  value = var.enable_mtls ? module.nomad_tls[0].nomad_tls_ca : ""
+}
 
 output "nomad_server_cert_base64" {
   description = "set this value for the `nomad.server.rpc.mTLS.certificate` key in the CircleCI Server's Helm values.yaml"
-  value       = var.deploy_nomad_server_instances ? "" : base64encode(module.nomad_tls.nomad_server_cert)
+  value       = var.enable_mtls ? base64encode(module.nomad_tls[0].nomad_server_cert) : ""
 }
 
 output "nomad_server_key_base64" {
   description = "set this value for the `nomad.server.rpc.mTLS.privateKey` key in the CircleCI Server's Helm values.yaml"
-  value       = var.deploy_nomad_server_instances ? "" : nonsensitive(base64encode(module.nomad_tls.nomad_server_key))
+  value       = var.enable_mtls ? nonsensitive(base64encode(module.nomad_tls[0].nomad_server_key)) : ""
 }
 
 output "nomad_tls_ca_base64" {
-  description = "set this value for the `nomad.server.rpc.mTLS.CACertificate` and `nomad.clients.mTLS.CACertificate` key in the CircleCI Server's Helm values.yaml"
-  value       = base64encode(module.nomad_tls.nomad_tls_ca)
-}
-
-output "nomad_clients_cert_base64" {
-  description = "set this value for the `nomad.clients.mTLS.certificate` key in the CircleCI Server's Helm values.yaml"
-  value       = var.deploy_nomad_server_instances ? base64encode(module.nomad_tls.nomad_client_cert) : ""
-}
-
-output "nomad_clients_key_base64" {
-  description = "set this value for the `nomad.clients.mTLS.privateKey` key in the CircleCI Server's Helm values.yaml"
-  value       = var.deploy_nomad_server_instances ? nonsensitive(base64encode(module.nomad_tls.nomad_client_key)) : ""
+  description = "set this value for the `nomad.server.rpc.mTLS.CACertificate` key in the CircleCI Server's Helm values.yaml"
+  value       = var.enable_mtls ? base64encode(module.nomad_tls[0].nomad_tls_ca) : ""
 }
 
 output "nomad_sg_id" {
@@ -50,11 +56,11 @@ output "nomad_role" {
 }
 
 output "nomad_server_lb_arn" {
-  value = var.deploy_nomad_server_instances ? aws_lb.internal_nlb[0].arn : ""
+  value = var.deploy_nomad_server_instances ? module.server[0].lb_arn : ""
 }
 
 output "nomad_server_lb_url" {
-  value = var.deploy_nomad_server_instances ? aws_lb.internal_nlb[0].dns_name : ""
+  value = var.deploy_nomad_server_instances ? module.server[0].lb_url : ""
 }
 
 output "nomad_server_autoscaling_role" {
@@ -62,28 +68,14 @@ output "nomad_server_autoscaling_role" {
 }
 
 output "nomad_server_sg_id" {
-  value = var.deploy_nomad_server_instances ? aws_security_group.nomad_server_sg[0].id : ""
+  value = var.deploy_nomad_server_instances ? module.server[0].nomad_sg_id : ""
 }
 
 output "nomad_server_autoscaling_group_arn" {
   value = var.deploy_nomad_server_instances ? module.server[0].autoscaling_group_arn : ""
 }
 
+
 output "nomad_server_autoscaling_group_name" {
   value = var.deploy_nomad_server_instances ? module.server[0].autoscaling_group_name : ""
-}
-
-output "nomad_server_lb_zone_id" {
-  value = var.deploy_nomad_server_instances ? aws_lb.internal_nlb[0].zone_id : ""
-}
-
-output "msg" {
-  value = (
-    var.deploy_nomad_server_instances
-    ? <<-EOT
-    Using External Nomad Servers -
-    Create a Route53 entry - nomad-server.${var.nomad_server_hostname} which points to ${aws_lb.internal_nlb[0].dns_name}
-  EOT
-    : ""
-  )
 }

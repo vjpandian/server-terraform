@@ -1,6 +1,7 @@
 variable "aws_region" {
   type        = string
   description = "The AWS region"
+  default     = ""
 }
 variable "subnet" {
   type        = string
@@ -25,7 +26,7 @@ variable "security_group_id" {
 
 variable "nomad_server_hostname" {
   type        = string
-  description = "Hostname of RPC service of Nomad control plane (e.g circleci.example.com)."
+  description = "Hostname of RPC service of Nomad control plane (e.g circleci.example.com). This can be ignored if deploy_nomad_server_instances is true"
   validation {
     condition     = !can(regex(":", var.nomad_server_hostname))
     error_message = "Found ':' in hostname. Port cannot be specified."
@@ -81,8 +82,8 @@ variable "volume_type" {
 
 variable "instance_type" {
   type        = string
-  description = "AWS Node type for nomad client instance. Must be Intel linux type"
-  default     = "t3a.2xlarge"
+  description = "AWS Node type for instance. Must be Intel linux type"
+  default     = "t3.2xlarge"
 }
 
 variable "ssh_key" {
@@ -91,9 +92,16 @@ variable "ssh_key" {
   default     = null
 }
 
+variable "enable_mtls" {
+  type        = bool
+  default     = true
+  description = "MTLS support for Nomad traffic. Modifying this can be dangerous and is not recommended."
+}
+
 variable "basename" {
   type        = string
   description = "Name used as prefix for AWS resources"
+  default     = ""
 }
 
 variable "vpc_id" {
@@ -227,7 +235,7 @@ variable "server_disk_size_gb" {
 variable "server_machine_type" {
   type        = string
   description = "The instance type of the EC2 Nomad Servers."
-  default     = "t3a.medium"
+  default     = "m4.xlarge"
 }
 
 variable "allow_ssh" {
@@ -246,6 +254,17 @@ variable "server_public_ip" {
   }
 }
 
+variable "tag_key_for_discover" {
+  type        = string
+  description = "The tag key placed on each EC2 instance for Nomad Server discoverability."
+  default     = "identifier"
+}
+
+variable "tag_value_for_discover" {
+  type        = string
+  description = "The tag value placed on each EC2 instance for Nomad Server discoverability."
+  default     = "circleci-nomad-server-instance"
+}
 
 variable "addr_type" {
   type        = string
@@ -254,15 +273,5 @@ variable "addr_type" {
   validation {
     condition     = contains(["private_v4"], var.addr_type)
     error_message = "This variable must be 'private_v4'."
-  }
-}
-
-variable "log_level" {
-  type        = string
-  default     = "INFO"
-  description = "Nomad Server and Client Log level"
-  validation {
-    condition     = contains(["INFO", "DEBUG", "WARN", "TRACE"], var.log_level)
-    error_message = "The value for log_level must be 'INFO', 'DEBUG', 'WARN', or 'TRACE'."
   }
 }

@@ -26,6 +26,12 @@ variable "subnetwork" {
   description = "Subnetwork to deploy nomad clients into. NB. This is required if using custom subnets"
 }
 
+variable "unsafe_disable_mtls" {
+  type        = bool
+  default     = false
+  description = "Disables mTLS between nomad client and servers. Compromises the authenticity and confidentiality of client-server communication. Should not be set to true in any production setting"
+}
+
 variable "retry_with_ssh_allowed_cidr_blocks" {
   type        = list(string)
   default     = ["0.0.0.0/0"]
@@ -35,7 +41,7 @@ variable "retry_with_ssh_allowed_cidr_blocks" {
 variable "allowed_ips_nomad_ssh_access" {
   type        = list(string)
   description = "List of IPv4 CIDR ranges that are permitted SSH access nomad clients nodes"
-  default     = ["35.235.240.0/20"] # GCP IAP CIDR block
+  default     = []
 }
 
 variable "nomad_server_hostname" {
@@ -254,12 +260,6 @@ variable "server_machine_type" {
   description = "Instance type for nomad server"
 }
 
-variable "server_machine_image_family" {
-  type        = string
-  description = "The family value used to retrieve the virtual machine image for nomad server."
-  default     = "ubuntu-2204-lts"
-}
-
 variable "server_disk_type" {
   type        = string
   default     = "pd-ssd"
@@ -312,34 +312,4 @@ variable "server_target_cpu_utilization" {
   type        = number
   default     = 0.8
   description = "Target CPU utilization to trigger autoscaling for nomad server cluster"
-}
-
-variable "log_level" {
-  type        = string
-  default     = "INFO"
-  description = "Nomad Server and Client Log level"
-  validation {
-    condition     = contains(["INFO", "DEBUG", "TRACE"], var.log_level)
-    error_message = "The value for log_level must be 'INFO', 'DEBUG', or 'TRACE'."
-  }
-}
-
-variable "k8s_cluster_name" {
-  type        = string
-  description = "Kubernetes Cluster Name"
-  default     = ""
-  validation {
-    condition     = !var.deploy_nomad_server_instances || length(var.k8s_cluster_name) > 0
-    error_message = "Kubernetes Cluster Name is required when deploying nomad server instances"
-  }
-}
-
-variable "k8s_cluster_location" {
-  type        = string
-  description = "Kubernetes Cluster Location, Either Region or Zone"
-  default     = ""
-  validation {
-    condition     = !var.deploy_nomad_server_instances || length(var.k8s_cluster_location) > 0
-    error_message = "Kubernetes Cluster Location is required when deploying nomad server instances"
-  }
 }

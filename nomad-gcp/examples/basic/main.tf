@@ -91,6 +91,7 @@ module "nomad" {
   nomad_server_hostname = var.nomad_server_hostname
   machine_type          = var.machine_type
 
+  unsafe_disable_mtls    = false
   assign_public_ip       = true
   preemptible            = true
   target_cpu_utilization = 0.50

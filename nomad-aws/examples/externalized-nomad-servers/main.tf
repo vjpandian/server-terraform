@@ -3,7 +3,7 @@ terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "~> 5"
+      version = "~>5.0"
     }
   }
 }
@@ -30,6 +30,8 @@ module "vpc" {
 module "nomad-aws" {
   source = "../.."
 
+  basename = "mytest"
+
   # Number of nomad clients to run
   nodes = 4
 
@@ -52,6 +54,16 @@ module "nomad-aws" {
   ]
   nomad_auto_scaler = false # If true, terraform will generate an IAM user to be used by nomad-autoscaler in CircleCI Server. The keys will be available in terraform's output
   max_nodes         = 5     # the max number of clients to scale to. Must be greater than our equal to the nodes set above.
+
+  # Externalized Nomad Servers
+  deploy_nomad_server_instances = true
+  server_public_ip              = true
+  allow_ssh                     = true
+  ssh_key                       = "<your-public-key>"
+  server_machine_type           = "t3a.micro"
+  max_server_instances          = 7
+  desired_server_instances      = 3
+  aws_region                    = "us-east-1"
 }
 
 output "nomad_module" {

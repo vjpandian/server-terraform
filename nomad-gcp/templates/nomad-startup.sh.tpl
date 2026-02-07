@@ -32,29 +32,14 @@ system_update() {
 	apt-get update && apt-get -y upgrade
 }
 
-retry() {
-    local -r -i max_attempts=5
-    local -i attempt_num=1
-
-    until "$@"; do
-        if (( attempt_num == max_attempts )); then
-            echo "Attempt $attempt_num failed and there are no more attempts left!"
-            exit 1
-        else
-            echo "Attempt $attempt_num failed! Trying again..."
-            ((attempt_num++))
-            sleep 5
-        fi
-    done
-}
-
 install() {
 	package=$@
 	log "--------------------------------------"
 	log "Installing $${package}"
 	log "--------------------------------------"
-	retry apt-get install -y $${package}
+	apt-get install -y $${package}
 }
+
 
 add_docker_repo() {
 	apt-get install -y apt-transport-https ca-certificates curl software-properties-common
@@ -89,9 +74,9 @@ enabled_docker_userns() {
 }
 
 configure_circleci() {
-	log "----------------------------------------------"
+	log "--------------------------------------"
 	log "Configuring CircleCI"
-	log "----------------------------------------------"
+	log "--------------------------------------"
 	public_ip="$(curl -H 'Metadata-Flavor: Google' http://169.254.169.254/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip)"
 	private_ip="$(hostname --ip-address)"
 	if ! (echo $public_ip | grep -qP "^[\d.]+$"); then
@@ -103,53 +88,44 @@ configure_circleci() {
 }
 
 install_nomad() {
-	log "----------------------------------------------"
-	log "Installing Nomad version ${nomad_version}"
-	log "----------------------------------------------"
+	log "--------------------------------------"
+	log "Installing Nomad"
+	log "--------------------------------------"
 	sudo apt-get update && \
-	sudo apt-get install wget gpg coreutils
-	wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
-	echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
-	sudo apt-get update && sudo apt-get install nomad=${nomad_version}
+	sudo apt-get install -y wget gpg coreutils
+	curl -fsSL https://apt.releases.hashicorp.com/gpg | \
+	  sudo gpg --dearmor --yes -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
 
-	nomad --version || ( echo "Nomad failed to install" && exit 1 )
+	echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | \
+	  sudo tee /etc/apt/sources.list.d/hashicorp.list
+
+	export DEBIAN_FRONTEND=noninteractive
+	sudo apt-get update
+	sudo apt-get install -y nomad=${nomad_version}
+
+	sudo nomad version || ( echo "Nomad failed to install" && exit 1 )
 }
 
 configure_nomad() {
-
-	log "----------------------------------------------"
+	log "--------------------------------------"
 	log "Installing TLS Certificates"
-	log "----------------------------------------------"
+	log "--------------------------------------"
 
-	mkdir -p /etc/ssl/nomad/
-	chmod 0755 /etc/ssl/nomad/
-	cat <<-EOT > /etc/ssl/nomad/client.pem
+	mkdir -p /etc/nomad/ssl
+	chmod 0700 /etc/nomad/ssl
+	cat <<-EOT > /etc/nomad/ssl/cert.pem
 	${client_tls_cert}
 	EOT
-	cat <<-EOT > /etc/ssl/nomad/key.pem
+	cat <<-EOT > /etc/nomad/ssl/key.pem
 	${client_tls_key}
 	EOT
-	cat <<-EOT > /etc/ssl/nomad/ca.pem
+	cat <<-EOT > /etc/nomad/ssl/ca.pem
 	${tls_ca}
 	EOT
-	ls -l /etc/ssl/nomad
-
-	echo "----------------------------------------------"
-	echo "      Setting environment variables"
-	echo "----------------------------------------------"
-	echo 'export NOMAD_CACERT=/etc/ssl/nomad/ca.pem' >> /etc/environment
-	echo 'export NOMAD_CLIENT_CERT=/etc/ssl/nomad/client.pem' >> /etc/environment
-	echo 'export NOMAD_CLIENT_KEY=/etc/ssl/nomad/key.pem' >> /etc/environment
-
-	[ "${external_nomad_server}" == "true" ] && SCHEME="https" || SCHEME="http"
-	echo "export NOMAD_ADDR=$SCHEME://localhost:4646" >> /etc/environment
-
-	source /etc/environment
-	env | grep "NOMAD_"
 
 	log "Setting nomad configuration"
 	mkdir -p /etc/nomad
-	cat <<-EOT > /etc/nomad/client.hcl
+	cat <<-EOT > /etc/nomad/config.hcl
 	log_level = "DEBUG"
 	name = "$(hostname)"
 	data_dir = "/opt/nomad"
@@ -164,13 +140,13 @@ configure_nomad() {
 	EOT
 	# Expecting to have DNS record for nomad server(s)
 	if [ "${add_server_join}" ]; then
-	cat <<-EOT >> /etc/nomad/client.hcl
+	cat <<-EOT >> /etc/nomad/config.hcl
 	  server_join = {
 		retry_join = ["${server_retry_join}"]
 	  }
 	EOT
 	fi
-	cat <<-EOT >> /etc/nomad/client.hcl
+	cat <<-EOT >> /etc/nomad/config.hcl
 	  node_class = "linux-64bit"
 	}
 	plugin "raw_exec" {
@@ -187,60 +163,36 @@ configure_nomad() {
 	}
 	EOT
 
-	if [ "${external_nomad_server}" == "true" ]; then
-	cat <<-EOT >> /etc/nomad/client.hcl
-	tls {
-		http = true
-		rpc  = true
-		# This verifies the CN ([role].[region].nomad) in the certificate,
-		# not the hostname or DNS name of the of the remote party.
-		# https://learn.hashicorp.com/tutorials/nomad/security-enable-tls?in=nomad/transport-security#node-certificates
-		verify_server_hostname = true
-		verify_https_client = false
-		ca_file   = "/etc/ssl/nomad/ca.pem"
-		cert_file = "/etc/ssl/nomad/client.pem"
-		key_file  = "/etc/ssl/nomad/key.pem"
-	}
-	EOT
-	else
-	cat <<-EOT >> /etc/nomad/client.hcl
-	tls {
-		http = false
-		rpc  = true
-		# This verifies the CN ([role].[region].nomad) in the certificate,
-		# not the hostname or DNS name of the of the remote party.
-		# https://learn.hashicorp.com/tutorials/nomad/security-enable-tls?in=nomad/transport-security#node-certificates
-		verify_server_hostname = true
-		verify_https_client = false
-		ca_file   = "/etc/ssl/nomad/ca.pem"
-		cert_file = "/etc/ssl/nomad/client.pem"
-		key_file  = "/etc/ssl/nomad/key.pem"
-	}
-	EOT
+	if [ "${client_tls_cert}" ]; then
+		cat <<-EOT >> /etc/nomad/config.hcl
+		tls {
+		  http = false
+		  rpc  = true
+		  # This verifies the CN ([role].[region].nomad) in the certificate,
+		  # not the hostname or DNS name of the of the remote party.
+		  # https://learn.hashicorp.com/tutorials/nomad/security-enable-tls?in=nomad/transport-security#node-certificates
+		  verify_server_hostname = true
+		  ca_file	= "/etc/nomad/ssl/ca.pem"
+		  cert_file = "/etc/nomad/ssl/cert.pem"
+		  key_file	= "/etc/nomad/ssl/key.pem"
+		}
+		EOT
 	fi
-	ls -l /etc/nomad/client.hcl
-
 
 	log "Writing nomad systemd unit"
 	cat <<-EOT > /etc/systemd/system/nomad.service
 	[Unit]
 	Description="nomad"
 	[Service]
-	Environment="NOMAD_CACERT=/etc/ssl/nomad/ca.pem"
-	Environment="NOMAD_CLIENT_CERT=/etc/ssl/nomad/client.pem"
-	Environment="NOMAD_CLIENT_KEY=/etc/ssl/nomad/key.pem"
-	Environment="NOMAD_ADDR=$NOMAD_ADDR"
 	Restart=always
 	RestartSec=30
 	TimeoutStartSec=1m
-	ExecStart=/usr/bin/nomad agent -config /etc/nomad/client.hcl
+	ExecStart=/usr/bin/nomad agent -config /etc/nomad/config.hcl
 	[Install]
 	WantedBy=multi-user.target
 	EOT
 
-	echo "----------------------------------------------"
 	log "Starting up nomad" 
-	echo "----------------------------------------------"
 	systemctl enable --now nomad
 }
 
@@ -291,14 +243,10 @@ setup_docker_gc() {
 	  --network=ci-privileged \
 	  --network-alias=docker-gc.internal.circleci.com \
 	  "circleci/docker-gc:2.0" \
-	  -threshold-percent 50 \
-	  -o11y-format text
+	  -threshold-percent 50
 	EOT
 	chmod 0700 /etc/docker-gc-start.rc
 
-	echo "----------------------------------------------"
-	log "starting docker garbage collection"
-	echo "----------------------------------------------"
 	systemctl enable --now docker-gc
 }
 
@@ -311,23 +259,14 @@ tune_io_scheduler
 system_update
 add_docker_repo
 
-echo "----------------------------------------"
-echo "	Removing Docker If Already Installed  "
-echo "----------------------------------------"
-sudo apt-get -y purge docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin docker-ce-rootless-extras
-
 install ntp
-
-echo "----------------------------------------"
-echo "	Installing Docker  "
-echo "----------------------------------------"
-apt-get install -y docker-ce=5:28.5.2-1~ubuntu.22.04~jammy docker-ce-cli=5:28.5.2-1~ubuntu.22.04~jammy || (echo "=================\nFailed to install docker-ce\n==================\n" && exit 1)
-
+install docker-ce=5:28.1.1-1~ubuntu.22.04~jammy
+install docker-ce-cli=5:28.1.1-1~ubuntu.22.04~jammy
 install jq
 
 enabled_docker_userns
 configure_circleci
-install_nomad || (echo "=================\nFailed to install nomad\n==================\n" && exit 1)
+install_nomad || exit 1
 configure_nomad
 
 create_ci_network
@@ -349,8 +288,5 @@ docker_chain="DOCKER-USER"
 /sbin/iptables --wait --insert $docker_chain 5 -i br+ --destination "${cidr_block}" --jump DROP
 %{ endfor ~}
 
-echo "--------------------------------------"
-echo "	Reverting Cgroup v2"
-echo "--------------------------------------"
 revert_cgroups
 reboot
